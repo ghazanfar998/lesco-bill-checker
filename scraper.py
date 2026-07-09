@@ -61,9 +61,9 @@ def fetch_pakistani_proxies():
     except Exception as e:
         logger.warning(f"Error fetching PK proxies from Proxyscrape: {e}")
         
-    # 2. Fetch from Geonode PK HTTP sorted by latency (fastest first)
+    # 2. Fetch from Geonode PK HTTP/HTTPS sorted by latency (fastest first)
     try:
-        url = "https://proxylist.geonode.com/api/proxy-list?limit=25&page=1&sort_by=latency&sort_type=asc&country=PK"
+        url = "https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=latency&sort_type=asc&country=PK&protocols=http,https"
         res = requests.get(url, timeout=5)
         if res.status_code == 200:
             data = res.json()
@@ -125,8 +125,8 @@ def fetch_bill_html(ref_no_clean):
         logger.info(f"Targeting Reference Number search flow for: {search_val}")
         
     url = "https://bill.pitc.com.pk/lescobill"
-    # Set max attempts to 3 on Vercel to stay safely under 10 seconds execution timeout
-    max_attempts = 3
+    # Set max attempts to 5 since Vercel has 60 seconds execution limit configured
+    max_attempts = 5
     pk_proxies = []
     
     # Auto-detect if we are running in cloud environment (Hugging Face or Vercel)
@@ -159,8 +159,8 @@ def fetch_bill_html(ref_no_clean):
             logger.info(f"Attempt {attempt}/{max_attempts}: Initiating direct GET request to {url}...")
             
         try:
-            # 1. GET Request (Shorter timeout when using proxy or on cloud to keep under Vercel 10s timeout)
-            res = session.get(url, headers=HEADERS, timeout=2.2 if use_proxy else (2.5 if is_cloud else 20))
+            # 1. GET Request (Generous timeout for proxies since we have 60s maxDuration limit on Vercel)
+            res = session.get(url, headers=HEADERS, timeout=6.0 if use_proxy else (3.0 if is_cloud else 20))
             if res.status_code != 200:
                 logger.warning(f"GET Request returned status code {res.status_code}")
                 if res.status_code in [500, 502, 503, 504]:
