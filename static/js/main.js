@@ -258,44 +258,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Queue processor (One-by-one sequential requests to prevent proxy overload/Vercel timeout)
                 const total = refNumbers.length;
-                let processed = 0;
+                const chunkSize = 3;
 
-                for (let i = 0; i < total; i++) {
-                    const refNo = refNumbers[i];
-                    processed++;
-                    const percent = Math.round((i / total) * 100);
-                    setLoaderProgress(percent, `Querying bill ${processed} of ${total} (${refNo})...`);
-
-                    try {
-                        const response = await fetch('/api/check_single', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ ref_no: refNo })
-                        });
-
-                        const result = await response.json();
-                        result.input_reference = refNo; // ensure reference number is tracked
+                for (let i = 0; i < total; i += chunkSize) {
+                    const chunk = refNumbers.slice(i, i + chunkSize);
+                    
+                    // Run chunk of 3 queries in parallel
+                    await Promise.all(chunk.map(async (refNo, index) => {
+                        const currentProcessed = i + index + 1;
+                        if (currentProcessed > total) return;
                         
-                        processedResults.push(result);
-                        appendResultRow(result, false);
-                        
-                        // Update Counter
-                        resultsCount.textContent = processedResults.length;
-                    } catch (err) {
-                        console.error(`Error fetching ${refNo}:`, err);
-                        const errObj = {
-                            input_reference: refNo,
-                            message: 'Network error or query timed out.'
-                        };
-                        processedResults.push(errObj);
-                        appendResultRow(errObj, false);
-                        resultsCount.textContent = processedResults.length;
-                    }
+                        try {
+                            const response = await fetch('/api/check_single', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ ref_no: refNo })
+                            });
 
-                    // Add a tiny 300ms polite pause between requests to prevent proxy server socket errors
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                            const result = await response.json();
+                            result.input_reference = refNo;
+                            
+                            processedResults.push(result);
+                            appendResultRow(result, false);
+                        } catch (err) {
+                            console.error(`Error fetching ${refNo}:`, err);
+                            const errObj = {
+                                input_reference: refNo,
+                                message: 'Network error or query timed out.'
+                            };
+                            processedResults.push(errObj);
+                            appendResultRow(errObj, false);
+                        }
+                    }));
+                    
+                    // Update Progress bar after the chunk finishes
+                    const currentDone = Math.min(i + chunkSize, total);
+                    const percent = Math.round((currentDone / total) * 100);
+                    setLoaderProgress(percent, `Querying bills... (${currentDone} of ${total} done)`);
+                    resultsCount.textContent = processedResults.length;
+                    
+                    // Polite 500ms delay between chunks to avoid socket issues
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
 
                 setLoaderProgress(100, 'Batch processing complete!');
