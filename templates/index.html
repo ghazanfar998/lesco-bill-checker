@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LESCO Bill Bulk Checker & Tracker</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Background Elements -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-box">
+                    <i class="fa-solid fa-bolt-lightning bolt-icon animate-pulse"></i>
+                </div>
+                <div>
+                    <h1>LESCO Bill Tracker</h1>
+                    <p>Bulk billing and payment status validation dashboard</p>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span class="status-indicator online"></span>
+                <span>Portal Online</span>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Layout -->
+        <main class="dashboard-grid">
+            
+            <!-- Left Panel: Actions (Upload / Single Check) -->
+            <section class="action-panel">
+                
+                <!-- Batch Excel Upload -->
+                <div class="glass-card">
+                    <div class="card-icon-title">
+                        <i class="fa-solid fa-file-excel card-icon text-excel"></i>
+                        <h2>Upload Excel Sheet</h2>
+                    </div>
+                    <p class="card-desc">Upload a `.xlsx` or `.xls` sheet containing LESCO 14-digit reference numbers or Customer IDs.</p>
+                    
+                    <div class="upload-dropzone" id="dropzone">
+                        <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
+                        <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                        <span class="dropzone-text">Drag & drop your Excel file here</span>
+                        <span class="dropzone-sub">or <strong class="text-glow">Browse Files</strong></span>
+                    </div>
+                    
+                    <div class="file-details" id="fileDetails" style="display: none;">
+                        <div class="file-info">
+                            <i class="fa-solid fa-file-invoice file-icon"></i>
+                            <div class="file-meta">
+                                <span class="file-name" id="fileName">sheet.xlsx</span>
+                                <span class="file-size" id="fileSize">14 KB</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-remove" id="btnRemoveFile" title="Remove file">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <button class="btn btn-primary w-100" id="btnProcessBatch" disabled>
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Process Excel Batch
+                    </button>
+                </div>
+
+                <!-- Single Lookup -->
+                <div class="glass-card">
+                    <div class="card-icon-title">
+                        <i class="fa-solid fa-magnifying-glass card-icon text-single"></i>
+                        <h2>Single Bill Lookup</h2>
+                    </div>
+                    <p class="card-desc">Quickly check status of a single Reference No or Customer ID.</p>
+                    
+                    <form id="singleCheckForm" class="single-check-form">
+                        <div class="input-group">
+                            <i class="fa-solid fa-fingerprint input-icon"></i>
+                            <input type="text" id="singleRefInput" placeholder="Reference No or Customer ID" maxlength="18" required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary w-100" id="btnSingleCheck">
+                            <i class="fa-solid fa-search"></i> Check Bill Status
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Right Panel: Processing Logs & Table Results -->
+            <section class="results-panel">
+                
+                <!-- Progress & Loader Card -->
+                <div class="glass-card" id="loaderCard" style="display: none;">
+                    <div class="loader-layout">
+                        <div class="spinner">
+                            <div class="spinner-circle spinner-circle-1"></div>
+                            <div class="spinner-circle spinner-circle-2"></div>
+                            <i class="fa-solid fa-bolt-lightning inner-bolt"></i>
+                        </div>
+                        <div class="loader-meta">
+                            <h3 id="loaderTitle">Fetching Bill Data...</h3>
+                            <p id="loaderMessage">Connecting to LESCO database. Please stand by...</p>
+                            <div class="progress-bar-container">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Grid / List -->
+                <div class="glass-card table-card">
+                    <div class="table-header">
+                        <div class="table-title">
+                            <i class="fa-solid fa-list-check title-icon"></i>
+                            <h2>Processed Bills (<span id="resultsCount">0</span>)</h2>
+                        </div>
+                        <button class="btn btn-success" id="btnDownloadExcel" style="display: none;">
+                            <i class="fa-solid fa-file-arrow-down"></i> Export to Excel
+                        </button>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="results-table" id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Input Reference</th>
+                                    <th>Consumer Name</th>
+                                    <th>Fetched Reference</th>
+                                    <th>Billing Month</th>
+                                    <th>Amount (Within)</th>
+                                    <th>Due Date</th>
+                                    <th>Payment Status</th>
+                                    <th>Payment Date</th>
+                                    <th>Message</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                <tr class="empty-state-row" id="emptyState">
+                                    <td colspan="10">
+                                        <div class="empty-state">
+                                            <i class="fa-solid fa-folder-open empty-icon"></i>
+                                            <p>No bills processed yet. Upload an Excel file or search a single reference number to start.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-toast" id="toast" style="display: none;">
+        <i class="fa-solid fa-circle-info toast-icon" id="toastIcon"></i>
+        <span class="toast-message" id="toastMessage">Toast message here</span>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
