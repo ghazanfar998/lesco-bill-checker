@@ -121,6 +121,10 @@ def upload_file():
         if not inputs:
             return jsonify({"status": "Error", "message": "No data rows found in the Excel sheet."}), 400
             
+        # Limit to maximum 30 reference numbers per batch to prevent serverless function timeout
+        if len(inputs) > 30:
+            return jsonify({"status": "Error", "message": "Batch limit exceeded. You can process up to 30 reference numbers at a time on the free tier."}), 400
+            
         logger.info(f"Loaded {len(inputs)} reference numbers for batch processing.")
         
         # Process concurrently using ThreadPoolExecutor
