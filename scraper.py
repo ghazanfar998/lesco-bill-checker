@@ -61,10 +61,10 @@ def fetch_pakistani_proxies():
     except Exception as e:
         logger.warning(f"Error fetching PK proxies from Proxyscrape: {e}")
         
-    # 2. Fetch from Geonode PK HTTP
+    # 2. Fetch from Geonode PK HTTP sorted by latency (fastest first)
     try:
-        url = "https://proxylist.geonode.com/api/proxy-list?limit=20&page=1&sort_by=lastChecked&sort_type=desc&country=PK"
-        res = requests.get(url, timeout=6)
+        url = "https://proxylist.geonode.com/api/proxy-list?limit=25&page=1&sort_by=latency&sort_type=asc&country=PK"
+        res = requests.get(url, timeout=5)
         if res.status_code == 200:
             data = res.json()
             for p in data.get('data', []):
@@ -125,19 +125,21 @@ def fetch_bill_html(ref_no_clean):
         logger.info(f"Targeting Reference Number search flow for: {search_val}")
         
     url = "https://bill.pitc.com.pk/lescobill"
-    max_attempts = 8
+    # Set max attempts to 3 on Vercel to stay safely under 10 seconds execution timeout
+    max_attempts = 3
     pk_proxies = []
     
-    # Auto-detect if we are running in Hugging Face Spaces environment
-    is_huggingface = os.environ.get("SPACE_ID") is not None
+    # Auto-detect if we are running in cloud environment (Hugging Face or Vercel)
+    # Vercel exposes VERCEL=1 env var
+    is_cloud = (os.environ.get("SPACE_ID") is not None) or (os.environ.get("VERCEL") is not None)
     
     for attempt in range(1, max_attempts + 1):
         session = requests.Session()
         use_proxy = False
         
-        # On Hugging Face, start using proxies on attempt 1.
+        # On Cloud hosting, start using proxies on attempt 1.
         # Locally, try direct connection on attempt 1, and fall back to proxies on attempts 2+.
-        if is_huggingface or attempt > 1:
+        if is_cloud or attempt > 1:
             if not pk_proxies:
                 pk_proxies = get_cached_proxies()
                 
@@ -157,8 +159,8 @@ def fetch_bill_html(ref_no_clean):
             logger.info(f"Attempt {attempt}/{max_attempts}: Initiating direct GET request to {url}...")
             
         try:
-            # 1. GET Request (Shorter timeout when using proxy to skip dead ones quickly)
-            res = session.get(url, headers=HEADERS, timeout=6 if use_proxy else 20)
+            # 1. GET Request (Shorter timeout when using proxy to skip dead ones quickly under 10s serverless limit)
+            res = session.get(url, headers=HEADERS, timeout=2.2 if use_proxy else 20)
             if res.status_code != 200:
                 logger.warning(f"GET Request returned status code {res.status_code}")
                 if res.status_code in [500, 502, 503, 504]:
