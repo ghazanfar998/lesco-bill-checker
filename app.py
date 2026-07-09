@@ -18,8 +18,9 @@ app.secret_key = str(uuid.uuid4())
 # In-memory storage for processed batches (in production, use Redis/db)
 BATCH_CACHE = {}
 
-# Clean temp folders
-TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp')
+# Clean temp folders (use cross-platform writeable system temp)
+import tempfile
+TEMP_DIR = os.path.join(tempfile.gettempdir(), 'temp')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 def find_reference_column(sheet):
