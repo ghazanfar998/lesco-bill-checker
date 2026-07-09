@@ -127,10 +127,9 @@ def upload_file():
             
         logger.info(f"Loaded {len(inputs)} reference numbers for batch processing.")
         
-        # Process concurrently using ThreadPoolExecutor
-        # Max workers set to 8 to be polite but fast
+        # Max workers set to 1 (sequential) to prevent proxy concurrency overload and rate limits
         results = []
-        max_workers = min(8, len(inputs))
+        max_workers = 1
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_input = {executor.submit(get_bill_details, item): item for item in inputs}
