@@ -64,7 +64,7 @@ def fetch_pakistani_proxies():
     # 2. Fetch from Geonode PK HTTP/HTTPS sorted by latency (fastest first)
     try:
         url = "https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=latency&sort_type=asc&country=PK&protocols=http,https"
-        res = requests.get(url, timeout=5)
+        res = requests.get(url, timeout=10)
         if res.status_code == 200:
             data = res.json()
             for p in data.get('data', []):
@@ -159,8 +159,8 @@ def fetch_bill_html(ref_no_clean):
             logger.info(f"Attempt {attempt}/{max_attempts}: Initiating direct GET request to {url}...")
             
         try:
-            # 1. GET Request (Generous timeout for proxies since we have 60s maxDuration limit on Vercel)
-            res = session.get(url, headers=HEADERS, timeout=6.0 if use_proxy else (3.0 if is_cloud else 20))
+            # 1. GET Request (Generous timeout of 12s for proxies since we have 60s maxDuration limit on Vercel)
+            res = session.get(url, headers=HEADERS, timeout=12.0 if use_proxy else (3.0 if is_cloud else 20))
             if res.status_code != 200:
                 logger.warning(f"GET Request returned status code {res.status_code}")
                 if res.status_code in [500, 502, 503, 504]:
@@ -192,7 +192,7 @@ def fetch_bill_html(ref_no_clean):
                     "ruCodeTextBox": ""
                 }
                 
-                pb_res = session.post(url, data=postback_data, headers=HEADERS, timeout=8 if use_proxy else (8 if is_cloud else 25))
+                pb_res = session.post(url, data=postback_data, headers=HEADERS, timeout=15.0 if use_proxy else (8 if is_cloud else 25))
                 if pb_res.status_code != 200:
                     logger.warning(f"Postback returned status code {pb_res.status_code}")
                     if pb_res.status_code in [500, 502, 503, 504]:
@@ -232,7 +232,7 @@ def fetch_bill_html(ref_no_clean):
                     post_data["ruCodeTextBox"] = ""
                     
             logger.info(f"Attempt {attempt}/{max_attempts}: Sending final POST request to fetch bill data...")
-            post_res = session.post(url, data=post_data, headers=HEADERS, timeout=10 if use_proxy else (10 if is_cloud else 45))
+            post_res = session.post(url, data=post_data, headers=HEADERS, timeout=15.0 if use_proxy else (10 if is_cloud else 45))
             
             if post_res.status_code != 200:
                 logger.warning(f"POST Request returned status code {post_res.status_code}")
