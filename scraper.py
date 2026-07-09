@@ -37,38 +37,44 @@ def extract_field(html, id_or_name):
 PROXIES_CACHE = []
 LAST_FETCH_TIME = 0
 HARDCODED_PK_PROXIES = [
-    "103.115.196.98:8080",
-    "182.185.165.125:8080",
-    "103.115.196.98:80"
+    "http://103.115.196.98:8080",
+    "http://182.185.165.125:8080",
+    "http://103.115.196.98:80"
 ]
 
 def fetch_pakistani_proxies():
     """
-    Fetches a list of public Pakistani (PK) HTTP proxies from Proxyscrape and Geonode APIs
+    Fetches a list of public Pakistani (PK) proxies (HTTP, SOCKS4, SOCKS5) from Proxyscrape and Geonode APIs
     to bypass geo-blocking/firewall restrictions on cloud data centers.
     """
     proxies = []
     
-    # 1. Fetch from Proxyscrape PK HTTP
+    # 1. Fetch from Proxyscrape PK HTTP/SOCKS v4 API
     try:
-        url = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=PK&ssl=all&anonymity=all"
+        url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text&country=pk"
         res = requests.get(url, timeout=6)
         if res.status_code == 200:
-            for line in res.text.split("\n"):
+            for line in res.text.splitlines():
                 p = line.strip()
-                if p and p not in proxies:
-                    proxies.append(p)
+                if p:
+                    # If it doesn't specify a protocol, default to http://
+                    if not (p.startswith("http://") or p.startswith("https://") or p.startswith("socks4://") or p.startswith("socks5://")):
+                        p = f"http://{p}"
+                    if p not in proxies:
+                        proxies.append(p)
     except Exception as e:
         logger.warning(f"Error fetching PK proxies from Proxyscrape: {e}")
         
-    # 2. Fetch from Geonode PK HTTP/HTTPS sorted by latency (fastest first)
+    # 2. Fetch from Geonode PK HTTP/HTTPS sorted by freshness (lastChecked desc)
     try:
-        url = "https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=latency&sort_type=asc&country=PK&protocols=http,https"
+        url = "https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=lastChecked&sort_type=desc&country=PK&protocols=http,https"
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             data = res.json()
             for p in data.get('data', []):
-                proxy_str = f"{p['ip']}:{p['port']}"
+                protocols = p.get('protocols', ['http'])
+                proto = protocols[0] if protocols else 'http'
+                proxy_str = f"{proto}://{p['ip']}:{p['port']}"
                 if proxy_str not in proxies:
                     proxies.append(proxy_str)
     except Exception as e:
@@ -77,8 +83,10 @@ def fetch_pakistani_proxies():
     # Combine with hardcoded fallback proxies
     for hp in HARDCODED_PK_PROXIES:
         if hp not in proxies:
-            # Put hardcoded ones at the front of the rotation for faster initial resolution
             proxies.insert(0, hp)
+            
+    logger.info(f"Loaded {len(proxies)} unique Pakistani proxies for routing.")
+    return proxies
             
     logger.info(f"Loaded {len(proxies)} unique Pakistani proxies for routing.")
     return proxies
@@ -150,8 +158,8 @@ def fetch_bill_html(ref_no_clean):
                 proxy = pk_proxies[proxy_index]
                 logger.info(f"Attempt {attempt}/{max_attempts}: Routing request via Pakistani proxy: {proxy} (index {proxy_index})")
                 session.proxies.update({
-                    "http": f"http://{proxy}",
-                    "https": f"http://{proxy}"
+                    "http": proxy,
+                    "https": proxy
                 })
                 use_proxy = True
             else:
