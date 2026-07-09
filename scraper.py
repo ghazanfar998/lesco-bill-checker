@@ -137,9 +137,9 @@ def fetch_bill_html(ref_no_clean):
         session = requests.Session()
         use_proxy = False
         
-        # On Cloud hosting, start using proxies on attempt 1.
-        # Locally, try direct connection on attempt 1, and fall back to proxies on attempts 2+.
-        if is_cloud or attempt > 1:
+        # Try direct connection on attempt 1 (fastest path).
+        # Fall back to Pakistani proxies on attempts 2+.
+        if attempt > 1:
             if not pk_proxies:
                 pk_proxies = get_cached_proxies()
                 
@@ -159,8 +159,8 @@ def fetch_bill_html(ref_no_clean):
             logger.info(f"Attempt {attempt}/{max_attempts}: Initiating direct GET request to {url}...")
             
         try:
-            # 1. GET Request (Shorter timeout when using proxy to skip dead ones quickly under 10s serverless limit)
-            res = session.get(url, headers=HEADERS, timeout=2.2 if use_proxy else 20)
+            # 1. GET Request (Shorter timeout when using proxy or on cloud to keep under Vercel 10s timeout)
+            res = session.get(url, headers=HEADERS, timeout=2.2 if use_proxy else (2.5 if is_cloud else 20))
             if res.status_code != 200:
                 logger.warning(f"GET Request returned status code {res.status_code}")
                 if res.status_code in [500, 502, 503, 504]:
@@ -192,7 +192,7 @@ def fetch_bill_html(ref_no_clean):
                     "ruCodeTextBox": ""
                 }
                 
-                pb_res = session.post(url, data=postback_data, headers=HEADERS, timeout=8 if use_proxy else 25)
+                pb_res = session.post(url, data=postback_data, headers=HEADERS, timeout=8 if use_proxy else (8 if is_cloud else 25))
                 if pb_res.status_code != 200:
                     logger.warning(f"Postback returned status code {pb_res.status_code}")
                     if pb_res.status_code in [500, 502, 503, 504]:
@@ -232,7 +232,7 @@ def fetch_bill_html(ref_no_clean):
                     post_data["ruCodeTextBox"] = ""
                     
             logger.info(f"Attempt {attempt}/{max_attempts}: Sending final POST request to fetch bill data...")
-            post_res = session.post(url, data=post_data, headers=HEADERS, timeout=10 if use_proxy else 45)
+            post_res = session.post(url, data=post_data, headers=HEADERS, timeout=10 if use_proxy else (10 if is_cloud else 45))
             
             if post_res.status_code != 200:
                 logger.warning(f"POST Request returned status code {post_res.status_code}")
