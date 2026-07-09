@@ -144,9 +144,11 @@ def fetch_bill_html(ref_no_clean):
                 pk_proxies = get_cached_proxies()
                 
             if pk_proxies:
-                # Select proxy in rotation
-                proxy = pk_proxies[(attempt - 1) % len(pk_proxies)]
-                logger.info(f"Attempt {attempt}/{max_attempts}: Routing request via Pakistani proxy: {proxy}")
+                # Calculate a unique index based on the reference number to distribute concurrent requests across different proxies
+                ref_digits_sum = sum(int(d) for d in ref_no_clean if d.isdigit())
+                proxy_index = (ref_digits_sum + attempt - 2) % len(pk_proxies)
+                proxy = pk_proxies[proxy_index]
+                logger.info(f"Attempt {attempt}/{max_attempts}: Routing request via Pakistani proxy: {proxy} (index {proxy_index})")
                 session.proxies.update({
                     "http": f"http://{proxy}",
                     "https": f"http://{proxy}"
